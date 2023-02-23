@@ -1,0 +1,12 @@
+[package]
+name = "geometry_dash"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = "0.9"
+bevy-inspector-egui = "0.17.0"
+bevy_rapier2d = { version = "*", features = [ "simd-stable", "debug-render" ] }
+
