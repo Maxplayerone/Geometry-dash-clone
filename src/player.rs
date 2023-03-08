@@ -25,8 +25,8 @@ const STARTING_POSTION: Vec3 = Vec3::new(-600.0, -220.0, 0.0);
 //flag for freezing player movement
 //(used for debugging)
 #[derive(Resource)]
-struct FreezeGame {
-    freeze: bool,
+struct PlayerSettings {
+    freeze_movement: bool,
 }
 
 fn player_spawn(
@@ -60,15 +60,15 @@ fn player_spawn(
         .insert(PlayerMarker)
         .insert(Name::new("Player"));
 
-    commands.insert_resource(FreezeGame { freeze: false });
+    commands.insert_resource(PlayerSettings { freeze_movement: false });
 }
 
 fn toggle_player_movement_state(
     keys: Res<Input<KeyCode>>,
-    mut freeze: ResMut<FreezeGame>,
+    mut player_settings: ResMut<PlayerSettings>,
 ){
     if keys.pressed(KeyCode::Key2) {
-        freeze.freeze = !freeze.freeze;
+        player_settings.freeze_movement = !player_settings.freeze_movement;
     }
 }
 
@@ -76,23 +76,25 @@ fn player_movement_linear(
     mut player_query: Query<&mut Transform, (With<PlayerMarker>, Without<CameraMarker>)>,
     mut camera_query: Query<&mut Transform, With<CameraMarker>>,
     time: Res<Time>,
-    freeze: Res<FreezeGame>,
+    player_settings: Res<PlayerSettings>,
 ) {
-    if !freeze.freeze {
-        let mut transform = player_query.single_mut();
-        let mut camera_transform = camera_query.single_mut();
+    if !player_settings.freeze_movement {
+        for mut transform in player_query.iter_mut(){
+            //let mut transform = player_query.single_mut();
+            let mut camera_transform = camera_query.single_mut();
 
-        transform.translation.x += PLAYER_SPEED * time.delta_seconds();
-        camera_transform.translation.x += PLAYER_SPEED * time.delta_seconds();
+            transform.translation.x += PLAYER_SPEED * time.delta_seconds();
+            camera_transform.translation.x += PLAYER_SPEED * time.delta_seconds();
+        }
     }
 }
 
 fn player_movement_jump(
     mut player_query: Query<(&mut Jump, &mut Velocity), With<PlayerMarker>>,
     keys: Res<Input<KeyCode>>,
-    freeze: Res<FreezeGame>,
+    player_settings: Res<PlayerSettings>,
 ) {
-    if !freeze.freeze {
+    if !player_settings.freeze_movement {
         for (mut jump, mut velocity) in player_query.iter_mut() {
             if keys.pressed(KeyCode::Up) && !jump.is_jumping {
                 velocity.linvel = Vec2::new(0.0, jump.value).into();
@@ -106,12 +108,14 @@ fn player_jump_animation(
     mut player_query: Query<(&mut Jump, &mut Transform), With<PlayerMarker>>,
     time: Res<Time>,
 ) {
-    let (mut jump, mut transform) = player_query.single_mut();
+    //let (mut jump, mut transform) = player_query.single_mut();
 
-    if jump.is_jumping {
-        let rotation_value = 45.0 * time.delta_seconds() * PLAYER_ROTATION_SPEED * -1.0;
-        jump.rotation_value += rotation_value;
-        transform.rotation = Quat::from_rotation_z(jump.rotation_value * 3.1415 / 180.0 as f32);
+    for (mut jump, mut transform) in player_query.iter_mut(){
+        if jump.is_jumping {
+            let rotation_value = 45.0 * time.delta_seconds() * PLAYER_ROTATION_SPEED * -1.0;
+            jump.rotation_value += rotation_value;
+            transform.rotation = Quat::from_rotation_z(jump.rotation_value * 3.1415 / 180.0 as f32);
+        }
     }
 }
 
@@ -130,15 +134,17 @@ fn reset_player_jump(
     mut ground_query: Query<Entity, With<GroundMarker>>,
     rapier_context: Res<RapierContext>,
 ) {
-    let (player_id, mut jump, mut transform) = player_query.single_mut();
+    //let (player_id, mut jump, mut transform) = player_query.single_mut();
 
     let ground_id = ground_query.single_mut();
 
-    if let Some(_contact_pair) = rapier_context.contact_pair(player_id, ground_id) {
-        jump.is_jumping = false;
-        transform.rotation = Quat::from_rotation_z(
-            ceil_to_full_rotation(jump.rotation_value) * 3.1415 / 180.0 as f32,
-        );
+    for (player_id, mut jump, mut transform) in player_query.iter_mut(){
+        if let Some(_contact_pair) = rapier_context.contact_pair(player_id, ground_id) {
+            jump.is_jumping = false;
+            transform.rotation = Quat::from_rotation_z(
+                ceil_to_full_rotation(jump.rotation_value) * 3.1415 / 180.0 as f32,
+            );
+        }
     }
 }
 
@@ -146,12 +152,18 @@ fn player_death(
     mut player_query: Query<(Entity, &mut Transform), (With<PlayerMarker>, Without<SpikeMarker>)>,
     mut spike_queries: Query<Entity, With<SpikeMarker>>,
     rapier_context: Res<RapierContext>,
+    mut player_settings: ResMut<PlayerSettings>,
+    mut commands: Commands,
 ){
-    let (player_id, mut transform) = player_query.single_mut();
+    //let (player_id, mut transform) = player_query.single_mut();
     
-    for spike_id in spike_queries.iter_mut(){
-        if let Some(_contact_pair) = rapier_context.contact_pair(player_id, spike_id){
-            println!("Death");
+    for (player_id, transform) in player_query.iter_mut(){
+        for spike_id in spike_queries.iter_mut(){
+            if let Some(_contact_pair) = rapier_context.contact_pair(player_id, spike_id){
+                player_settings.freeze_movement = true;
+                commands.entity(player_id).despawn();
+                println!("Death");
+            }
         }
     }
 }
