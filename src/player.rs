@@ -30,12 +30,9 @@ struct PlayerSettings {
 }
 
 #[derive(Default)]
-struct RespawnPlayerEvent;
+pub struct RespawnPlayerEvent;
 
-fn player_spawn(
-    mut commands: Commands,
-    game_assets: Res<GameAssets>,
-) {
+fn player_spawn(mut commands: Commands, game_assets: Res<GameAssets>) {
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: game_assets.texture_atlas.clone(),
@@ -115,7 +112,11 @@ fn toggle_player_movement_state(
     mut player_settings: ResMut<PlayerSettings>,
 ) {
     if keys.pressed(KeyCode::Key2) {
-        player_settings.freeze_movement = !player_settings.freeze_movement;
+        player_settings.freeze_movement = true;
+    }
+
+    if keys.pressed(KeyCode::Key1) {
+        player_settings.freeze_movement = false;
     }
 }
 
@@ -194,6 +195,7 @@ fn player_death(
     mut player_query: Query<Entity, (With<PlayerMarker>, Without<SpikeMarker>)>,
     mut spike_queries: Query<Entity, With<SpikeMarker>>,
     rapier_context: Res<RapierContext>,
+
     mut player_settings: ResMut<PlayerSettings>,
     mut commands: Commands,
     mut respawn_player_ev: EventWriter<RespawnPlayerEvent>,
@@ -202,9 +204,10 @@ fn player_death(
         for spike_id in spike_queries.iter_mut() {
             if let Some(_contact_pair) = rapier_context.contact_pair(player_id, spike_id) {
                 player_settings.freeze_movement = true;
+
                 commands.entity(player_id).despawn();
+
                 respawn_player_ev.send_default();
-                println!("Death");
             }
         }
     }
