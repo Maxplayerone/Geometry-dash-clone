@@ -9,6 +9,7 @@ edition = "2021"
 bevy = {version = "0.9", features = ["dynamic"]}
 bevy-inspector-egui = "0.17.0"
 bevy_rapier2d = { version = "*", features = [ "simd-stable", "debug-render" ] }
+bevy_prototype_debug_lines = "0.9"
 
 [profile.dev]
 opt-level = 1

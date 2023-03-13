@@ -134,7 +134,10 @@ fn update_attemps_text(
                 color: Color::WHITE,
             };
 
-            *text = Text::from_section(format!("Attempts: {}", level_state.attempts), text_style.clone());
+            *text = Text::from_section(
+                format!("Attempts: {}", level_state.attempts),
+                text_style.clone(),
+            );
         }
     }
 }
@@ -219,7 +222,6 @@ fn player_death(
     for player_id in player_query.iter_mut() {
         for spike_id in spike_queries.iter_mut() {
             if let Some(_contact_pair) = rapier_context.contact_pair(player_id, spike_id) {
-
                 respawn_player_ev.send_default();
             }
         }
@@ -230,10 +232,10 @@ fn reset_player_state(
     mut respawn_player_ev: EventReader<RespawnPlayerEvent>,
     mut player_query: Query<&mut Transform, (With<PlayerMarker>, Without<LevelCameraMarker>)>,
     mut camera_query: Query<&mut Transform, With<LevelCameraMarker>>,
-){
-    for _ in respawn_player_ev.iter(){
-        for mut player_transform in player_query.iter_mut(){
-            for mut camera_transform in camera_query.iter_mut(){
+) {
+    for _ in respawn_player_ev.iter() {
+        for mut player_transform in player_query.iter_mut() {
+            for mut camera_transform in camera_query.iter_mut() {
                 player_transform.translation = STARTING_PLAYER_POSTION;
                 camera_transform.translation = STARTING_CAMERA_POSTION;
             }
@@ -244,8 +246,7 @@ fn reset_player_state(
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_event::<RespawnPlayerEvent>()
+        app.add_event::<RespawnPlayerEvent>()
             .add_system(level_open)
             .add_system(level_close)
             .add_system(player_movement_linear)

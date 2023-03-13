@@ -1,10 +1,12 @@
 use crate::{GameState, GameStateVariant};
 use bevy::{input::mouse::MouseScrollUnit, input::mouse::MouseWheel, prelude::*};
+use bevy_prototype_debug_lines::{DebugLines, DebugLinesPlugin};
 
 #[derive(Component)]
 struct EditorCameraMarker;
 
-const CAMERA_ZOOM_SPEED: f32 = 50.0;
+const CAMERA_ZOOM_SPEED: f32 = 10.0;
+const BLOCK_SIZE: f32 = 64.0;
 
 #[derive(Resource)]
 pub struct EditorState {
@@ -99,13 +101,38 @@ fn camera_movement(
     }
 }
 
+fn draw_editor_lines(mut lines: ResMut<DebugLines>) {
+    let offset = 32.0;
+    for i in 0..30 {
+        lines.line_gradient(
+            Vec3::new(-10000.0, (i as f32 * BLOCK_SIZE + -1280.0) + offset, 0.0),
+            Vec3::new(10000.0, (i as f32 * BLOCK_SIZE + -1280.0) + offset, 0.0),
+            0.0,
+            Color::WHITE,
+            Color::PINK,
+        );
+    }
+
+    for i in 0..30 {
+        lines.line_gradient(
+            Vec3::new((i as f32 * BLOCK_SIZE + -1280.0) + offset, -1000.0, 0.0),
+            Vec3::new((i as f32 * BLOCK_SIZE + -1280.0) + offset, 1000.0, 0.0),
+            0.0,
+            Color::WHITE,
+            Color::PINK,
+        );
+    }
+}
+
 pub struct EditorPlugin;
 impl Plugin for EditorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<MouseWheel>()
+        app.add_plugin(DebugLinesPlugin::default())
+            .add_event::<MouseWheel>()
             .add_system(editor_open)
             .add_system(editor_close)
             .add_system(camera_movement)
-            .add_system(camera_zoom);
+            .add_system(camera_zoom)
+            .add_system(draw_editor_lines);
     }
 }

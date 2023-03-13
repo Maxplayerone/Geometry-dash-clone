@@ -82,7 +82,7 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
                 ..default()
             })
             .insert(Transform {
-                translation: Vec3::new(i as f32 * 64.0, -260.0, 0.0),
+                translation: Vec3::new(i as f32 * 64.0, -256.0, 0.0),
                 scale: Vec3::new(2.0, 2.0, 1.0),
                 ..default()
             })
@@ -93,16 +93,14 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
 
     //ground
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgb(1.0, 1.0, 1.0),
-                ..default()
-            },
+        .spawn(SpriteSheetBundle {
+            texture_atlas: game_assets.texture_atlas.clone(),
+            sprite: TextureAtlasSprite::new(10),
             ..default()
         })
         .insert(Transform {
-            translation: Vec3::new(0.0, -325.0, 0.0),
-            scale: Vec3::new(5000.0, 70.0, 1.0),
+            translation: Vec3::new(0.0, -320.0, 0.0),
+            scale: Vec3::new(500.0, 2.0, 1.0),
             ..default()
         })
         .insert(RigidBody::Fixed)
