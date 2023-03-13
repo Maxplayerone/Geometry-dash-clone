@@ -1,13 +1,21 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::CameraMarker;
-use crate::GameAssets;
-use crate::GroundMarker;
-use crate::SpikeMarker;
+use crate::{GameAssets, GameState, GameStateVariant, GroundMarker, SpikeMarker};
 
 #[derive(Component)]
 struct PlayerMarker;
+#[derive(Component)]
+struct LevelCameraMarker;
+#[derive(Component)]
+struct AttemptsTextMarker;
+
+const PLAYER_JUMP_VALUE: f32 = 900.0;
+const PLAYER_SPEED: f32 = 450.0;
+const PLAYER_ROTATION_SPEED: f32 = 5.0;
+
+pub const STARTING_PLAYER_POSTION: Vec3 = Vec3::new(-600.0, -220.0, 0.0);
+pub const STARTING_CAMERA_POSTION: Vec3 = Vec3::new(-300.0, 0.0, 0.0);
 
 #[derive(Component)]
 struct Jump {
@@ -16,63 +24,22 @@ struct Jump {
     rotation_value: f32,
 }
 
-const PLAYER_SPEED: f32 = 450.0;
-const PLAYER_ROTATION_SPEED: f32 = 5.0;
-const PLAYER_JUMP_VALUE: f32 = 900.0;
-
-pub const STARTING_POSTION: Vec3 = Vec3::new(-600.0, -220.0, 0.0);
-
-//flag for freezing player movement
-//(used for debugging)
 #[derive(Resource)]
-struct PlayerSettings {
-    freeze_movement: bool,
+pub struct LevelState {
+    pub attempts: u32,
+    pub active: bool,
 }
 
 #[derive(Default)]
 pub struct RespawnPlayerEvent;
 
-fn player_spawn(mut commands: Commands, game_assets: Res<GameAssets>) {
-    commands
-        .spawn(SpriteSheetBundle {
-            texture_atlas: game_assets.texture_atlas.clone(),
-            sprite: TextureAtlasSprite::new(2),
-            ..default()
-        })
-        .insert(Transform {
-            translation: STARTING_POSTION,
-            scale: Vec3::new(2.0, 2.0, 1.0),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(LockedAxes::ROTATION_LOCKED)
-        .insert(GravityScale(31.0))
-        .insert(Velocity {
-            linvel: Vec2::new(10.0, 0.0),
-            angvel: 0.0,
-        })
-        .insert(Collider::cuboid(15.0, 15.0))
-        .insert(Jump {
-            value: PLAYER_JUMP_VALUE,
-            is_jumping: true,
-            rotation_value: 0.0,
-        })
-        .insert(PlayerMarker)
-        .insert(Name::new("Player"));
-
-    commands.insert_resource(PlayerSettings {
-        freeze_movement: false,
-    });
-}
-
-fn player_respawn(
+fn level_open(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
-    mut player_respawn_ev: EventReader<RespawnPlayerEvent>,
-    mut player_settings: ResMut<PlayerSettings>,
-    mut camera_query: Query<&mut Transform, With<CameraMarker>>,
+    game_state: Res<GameState>,
+    mut level_state: ResMut<LevelState>,
 ) {
-    for _ in player_respawn_ev.iter() {
+    if game_state.variant == GameStateVariant::Level && level_state.active == false {
         commands
             .spawn(SpriteSheetBundle {
                 texture_atlas: game_assets.texture_atlas.clone(),
@@ -80,7 +47,7 @@ fn player_respawn(
                 ..default()
             })
             .insert(Transform {
-                translation: STARTING_POSTION,
+                translation: STARTING_PLAYER_POSTION,
                 scale: Vec3::new(2.0, 2.0, 1.0),
                 ..default()
             })
@@ -100,38 +67,90 @@ fn player_respawn(
             .insert(PlayerMarker)
             .insert(Name::new("Player"));
 
-        let mut camera_transform = camera_query.single_mut();
-        camera_transform.translation.x = -300.0;
+        commands.spawn((
+            Camera2dBundle {
+                transform: Transform {
+                    translation: STARTING_CAMERA_POSTION,
+                    ..default()
+                },
+                ..default()
+            },
+            LevelCameraMarker,
+            Name::new("LevelCamera"),
+        ));
 
-        player_settings.freeze_movement = false;
+        let text_style = TextStyle {
+            font: game_assets.font_roboto_black.clone(),
+            font_size: 33.5,
+            color: Color::WHITE,
+        };
+
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section("Attempts 0", text_style.clone()),
+                ..default()
+            })
+            .insert(Transform {
+                translation: Vec3::new(-660.0, -155.0, 0.0),
+                ..default()
+            })
+            .insert(AttemptsTextMarker);
+
+        level_state.active = true;
     }
 }
 
-fn toggle_player_movement_state(
-    keys: Res<Input<KeyCode>>,
-    mut player_settings: ResMut<PlayerSettings>,
+fn level_close(
+    mut commands: Commands,
+    player_query: Query<Entity, (With<PlayerMarker>, Without<LevelCameraMarker>)>,
+    camera_query: Query<Entity, With<LevelCameraMarker>>,
+    game_state: Res<GameState>,
+    mut level_state: ResMut<LevelState>,
 ) {
-    if keys.pressed(KeyCode::Key2) {
-        player_settings.freeze_movement = true;
+    if game_state.variant == GameStateVariant::Editor && level_state.active == true {
+        for player_id in player_query.iter() {
+            for camera_id in camera_query.iter() {
+                commands.entity(camera_id).despawn();
+                commands.entity(player_id).despawn();
+                level_state.active = false;
+            }
+        }
     }
+}
 
-    if keys.pressed(KeyCode::Key1) {
-        player_settings.freeze_movement = false;
+fn update_attemps_text(
+    mut respawn_player_ev: EventReader<RespawnPlayerEvent>,
+    mut level_state: ResMut<LevelState>,
+    mut attempts_text: Query<&mut Text, With<AttemptsTextMarker>>,
+    game_assets: Res<GameAssets>,
+) {
+    for _ in respawn_player_ev.iter() {
+        for mut text in attempts_text.iter_mut() {
+            level_state.attempts += 1;
+
+            let text_style = TextStyle {
+                font: game_assets.font_roboto_black.clone(),
+                font_size: 33.5,
+                color: Color::WHITE,
+            };
+
+            *text = Text::from_section(format!("Attempts: {}", level_state.attempts), text_style.clone());
+        }
     }
 }
 
 fn player_movement_linear(
-    mut player_query: Query<&mut Transform, (With<PlayerMarker>, Without<CameraMarker>)>,
-    mut camera_query: Query<&mut Transform, With<CameraMarker>>,
+    mut player_query: Query<&mut Transform, (With<PlayerMarker>, Without<LevelCameraMarker>)>,
+    mut camera_query: Query<&mut Transform, With<LevelCameraMarker>>,
     time: Res<Time>,
-    player_settings: Res<PlayerSettings>,
+    level_state: Res<LevelState>,
 ) {
-    if !player_settings.freeze_movement {
+    if level_state.active {
         for mut transform in player_query.iter_mut() {
-            let mut camera_transform = camera_query.single_mut();
-
-            transform.translation.x += PLAYER_SPEED * time.delta_seconds();
-            camera_transform.translation.x += PLAYER_SPEED * time.delta_seconds();
+            for mut camera_transform in camera_query.iter_mut() {
+                transform.translation.x += PLAYER_SPEED * time.delta_seconds();
+                camera_transform.translation.x += PLAYER_SPEED * time.delta_seconds();
+            }
         }
     }
 }
@@ -139,9 +158,9 @@ fn player_movement_linear(
 fn player_movement_jump(
     mut player_query: Query<(&mut Jump, &mut Velocity), With<PlayerMarker>>,
     keys: Res<Input<KeyCode>>,
-    player_settings: Res<PlayerSettings>,
+    level_state: Res<LevelState>,
 ) {
-    if !player_settings.freeze_movement {
+    if level_state.active {
         for (mut jump, mut velocity) in player_query.iter_mut() {
             if keys.pressed(KeyCode::Up) && !jump.is_jumping {
                 velocity.linvel = Vec2::new(0.0, jump.value).into();
@@ -195,19 +214,28 @@ fn player_death(
     mut player_query: Query<Entity, (With<PlayerMarker>, Without<SpikeMarker>)>,
     mut spike_queries: Query<Entity, With<SpikeMarker>>,
     rapier_context: Res<RapierContext>,
-
-    mut player_settings: ResMut<PlayerSettings>,
-    mut commands: Commands,
     mut respawn_player_ev: EventWriter<RespawnPlayerEvent>,
 ) {
     for player_id in player_query.iter_mut() {
         for spike_id in spike_queries.iter_mut() {
             if let Some(_contact_pair) = rapier_context.contact_pair(player_id, spike_id) {
-                player_settings.freeze_movement = true;
-
-                commands.entity(player_id).despawn();
 
                 respawn_player_ev.send_default();
+            }
+        }
+    }
+}
+
+fn reset_player_state(
+    mut respawn_player_ev: EventReader<RespawnPlayerEvent>,
+    mut player_query: Query<&mut Transform, (With<PlayerMarker>, Without<LevelCameraMarker>)>,
+    mut camera_query: Query<&mut Transform, With<LevelCameraMarker>>,
+){
+    for _ in respawn_player_ev.iter(){
+        for mut player_transform in player_query.iter_mut(){
+            for mut camera_transform in camera_query.iter_mut(){
+                player_transform.translation = STARTING_PLAYER_POSTION;
+                camera_transform.translation = STARTING_CAMERA_POSTION;
             }
         }
     }
@@ -216,14 +244,16 @@ fn player_death(
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(player_spawn)
+        app
             .add_event::<RespawnPlayerEvent>()
+            .add_system(level_open)
+            .add_system(level_close)
             .add_system(player_movement_linear)
             .add_system(player_movement_jump)
             .add_system(player_jump_animation.before(reset_player_jump))
             .add_system(reset_player_jump)
             .add_system(player_death)
-            .add_system(player_respawn)
-            .add_system(toggle_player_movement_state);
+            .add_system(update_attemps_text)
+            .add_system(reset_player_state);
     }
 }
