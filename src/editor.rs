@@ -1,6 +1,7 @@
-use crate::{GameState, GameStateVariant};
 use bevy::{input::mouse::MouseScrollUnit, input::mouse::MouseWheel, prelude::*};
 use bevy_prototype_debug_lines::{DebugLines, DebugLinesPlugin};
+
+use crate::{GameAssets, GameState, GameStateVariant};
 
 #[derive(Component)]
 struct EditorCameraMarker;
@@ -11,6 +12,7 @@ const BLOCK_SIZE: f32 = 64.0;
 #[derive(Resource)]
 pub struct EditorState {
     pub active: bool,
+    pub picked_block_id: u8,
 }
 
 //used once when transitioning from level to editor
@@ -31,6 +33,7 @@ fn editor_open(
             EditorCameraMarker,
             Name::new("EditorCamera"),
         ));
+
         editor_state.active = true;
     }
 }
@@ -101,26 +104,87 @@ fn camera_movement(
     }
 }
 
-fn draw_editor_lines(mut lines: ResMut<DebugLines>) {
-    let offset = 32.0;
-    for i in 0..30 {
-        lines.line_gradient(
-            Vec3::new(-10000.0, (i as f32 * BLOCK_SIZE + -1280.0) + offset, 0.0),
-            Vec3::new(10000.0, (i as f32 * BLOCK_SIZE + -1280.0) + offset, 0.0),
-            0.0,
-            Color::WHITE,
-            Color::PINK,
-        );
-    }
+fn draw_editor_lines(
+    mut lines: ResMut<DebugLines>,
+    camera_query: Query<&Transform, With<EditorCameraMarker>>,
+) {
+    for transform in camera_query.iter() {
+        if transform.scale.x < 2.0 {
+            let offset = 32.0;
+            for i in 0..50 {
+                lines.line_gradient(
+                    Vec3::new(-1000.0, (i as f32 * BLOCK_SIZE + -1280.0) + offset, 0.0),
+                    Vec3::new(1000.0, (i as f32 * BLOCK_SIZE + -1280.0) + offset, 0.0),
+                    0.0,
+                    Color::WHITE,
+                    Color::PINK,
+                );
+            }
 
-    for i in 0..30 {
-        lines.line_gradient(
-            Vec3::new((i as f32 * BLOCK_SIZE + -1280.0) + offset, -1000.0, 0.0),
-            Vec3::new((i as f32 * BLOCK_SIZE + -1280.0) + offset, 1000.0, 0.0),
-            0.0,
-            Color::WHITE,
-            Color::PINK,
-        );
+            for i in 0..50 {
+                lines.line_gradient(
+                    Vec3::new((i as f32 * BLOCK_SIZE + -1280.0) + offset, -1000.0, 0.0),
+                    Vec3::new((i as f32 * BLOCK_SIZE + -1280.0) + offset, 1000.0, 0.0),
+                    0.0,
+                    Color::WHITE,
+                    Color::PINK,
+                );
+            }
+        }
+    }
+}
+
+fn place_blocks(
+    windows: Res<Windows>,
+    buttons: Res<Input<MouseButton>>,
+    game_assets: Res<GameAssets>,
+    mut commands: Commands,
+    editor_state: Res<EditorState>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<EditorCameraMarker>>,
+) {
+    let window = windows.get_primary().unwrap();
+
+    if buttons.just_pressed(MouseButton::Left) {
+        for (camera, camera_transform) in camera_query.iter() {
+            if let Some(world_position) = window
+                .cursor_position()
+                .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+                .map(|ray| ray.origin.truncate())
+            {
+                let mut pos = Vec3::new(0.0, 0.0, 0.0);
+                let r = world_position.x as i32 % BLOCK_SIZE as i32;
+                if r < (BLOCK_SIZE / 2.0) as i32 {
+                    pos.x = world_position.x - r as f32;
+                } else {
+                    pos.x = world_position.x + (BLOCK_SIZE - r as f32);
+                }
+
+                let r = world_position.y as i32 % BLOCK_SIZE as i32;
+                if r < (BLOCK_SIZE / 2.0) as i32 {
+                    pos.y = world_position.y - r as f32;
+                } else {
+                    pos.y = world_position.y + (BLOCK_SIZE - r as f32);
+                }
+
+                commands
+                    .spawn(SpriteSheetBundle {
+                        texture_atlas: game_assets.texture_atlas.clone(),
+                        sprite: TextureAtlasSprite::new(editor_state.picked_block_id.into()),
+                        ..default()
+                    })
+                    .insert(Transform {
+                        translation: pos,
+                        scale: Vec3::new(2.0, 2.0, 1.0),
+                        ..default()
+                    });
+            }
+        }
+    }
+}
+
+fn select_block(keyboard: Res<Input<KeyCode>>, mut editor_state: ResMut<EditorState>) {
+    if keyboard.pressed(KeyCode::Q) {
+        editor_state.picked_block_id = 9;
     }
 }
 
@@ -133,6 +197,8 @@ impl Plugin for EditorPlugin {
             .add_system(editor_close)
             .add_system(camera_movement)
             .add_system(camera_zoom)
+            .add_system(place_blocks)
+            .add_system(select_block)
             .add_system(draw_editor_lines);
     }
 }

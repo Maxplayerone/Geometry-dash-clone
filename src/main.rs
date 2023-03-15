@@ -16,6 +16,8 @@ struct SpikeMarker;
 
 //others
 const BG_COLOR: Color = Color::rgb(0.2, 0.36, 0.89);
+pub const HEIGHT: f32 = 720.0;
+pub const WIDTH: f32 = 1280.0;
 
 #[derive(Resource)]
 struct GameAssets {
@@ -36,7 +38,20 @@ pub enum GameStateVariant {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    window: WindowDescriptor {
+                        width: WIDTH,
+                        height: HEIGHT,
+                        title: "Bevy Tower Defense".to_string(),
+                        resizable: false,
+                        ..Default::default()
+                    },
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+        )
         .add_plugin(WorldInspectorPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.0))
         .add_plugin(RapierDebugRenderPlugin {
@@ -112,7 +127,10 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
         variant: GameStateVariant::Editor,
     });
 
-    commands.insert_resource(EditorState { active: false });
+    commands.insert_resource(EditorState {
+        active: false,
+        picked_block_id: 0,
+    });
     commands.insert_resource(LevelState {
         attempts: 0,
         active: false,
