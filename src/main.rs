@@ -21,7 +21,9 @@ pub const WIDTH: f32 = 1280.0;
 
 #[derive(Resource)]
 struct GameAssets {
-    texture_atlas: Handle<TextureAtlas>,
+    cube0: Handle<Image>,
+    cube1: Handle<Image>,
+    blocks: [Handle<Image>; 3],
     font_roboto_black: Handle<Font>,
 }
 
@@ -72,18 +74,20 @@ fn main() {
 fn asset_loading(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
-    let texture_handle = asset_server.load("gj_sheet0.png");
-    let texture_atlas =
-        TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 8, 2, None, None);
-    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    let cube0 = asset_server.load("cube0.png");
+    let cube1 = asset_server.load("cube1.png");
+    let block0 = asset_server.load("block0.png");
+    let block1 = asset_server.load("block1.png");
+    let block2 = asset_server.load("block2.png");
 
     let font_roboto_black = asset_server.load("fonts/Roboto-Black.ttf");
 
     commands.insert_resource(GameAssets {
-        texture_atlas: texture_atlas_handle,
         font_roboto_black,
+        cube0, 
+        cube1,
+        blocks: [block0, block1, block2],
     });
 }
 
@@ -91,9 +95,8 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
     //spikes
     for i in 0..3 {
         commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: game_assets.texture_atlas.clone(),
-                sprite: TextureAtlasSprite::new(8),
+            .spawn(SpriteBundle {
+                texture: game_assets.blocks[0].clone(),
                 ..default()
             })
             .insert(Transform {
@@ -108,9 +111,8 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
 
     //ground
     commands
-        .spawn(SpriteSheetBundle {
-            texture_atlas: game_assets.texture_atlas.clone(),
-            sprite: TextureAtlasSprite::new(10),
+        .spawn(SpriteBundle {
+            texture: game_assets.blocks[2].clone(),
             ..default()
         })
         .insert(Transform {
@@ -119,7 +121,7 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
             ..default()
         })
         .insert(RigidBody::Fixed)
-        .insert(Collider::cuboid(0.5, 0.5))
+        .insert(Collider::cuboid(150.0, 15.0))
         .insert(GroundMarker)
         .insert(Name::new("Ground"));
 
@@ -130,6 +132,7 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
     commands.insert_resource(EditorState {
         active: false,
         picked_block_id: 0,
+        freeze_block_placing: false,
     });
     commands.insert_resource(LevelState {
         attempts: 0,

@@ -1,10 +1,19 @@
 use bevy::{input::mouse::MouseScrollUnit, input::mouse::MouseWheel, prelude::*};
 use bevy_prototype_debug_lines::{DebugLines, DebugLinesPlugin};
+use bevy_rapier2d::prelude::*;
+//use bevy_egui::{egui, EguiContext, EguiPlugin};
 
-use crate::{GameAssets, GameState, GameStateVariant};
+use crate::{GameAssets, GameState, GameStateVariant, GroundMarker};
 
 #[derive(Component)]
 struct EditorCameraMarker;
+#[derive(Component)]
+struct NodeForBlockPlacingButtonsMarker;
+
+#[derive(Component)]
+struct BlockButton {
+    id: u8,
+}
 
 const CAMERA_ZOOM_SPEED: f32 = 10.0;
 const BLOCK_SIZE: f32 = 64.0;
@@ -13,6 +22,7 @@ const BLOCK_SIZE: f32 = 64.0;
 pub struct EditorState {
     pub active: bool,
     pub picked_block_id: u8,
+    pub freeze_block_placing: bool,
 }
 
 //used once when transitioning from level to editor
@@ -20,6 +30,7 @@ fn editor_open(
     mut commands: Commands,
     game_state: Res<GameState>,
     mut editor_state: ResMut<EditorState>,
+    game_assets: Res<GameAssets>,
 ) {
     if game_state.variant == GameStateVariant::Editor && !editor_state.active {
         commands.spawn((
@@ -34,20 +45,32 @@ fn editor_open(
             Name::new("EditorCamera"),
         ));
 
+        spawn_button(commands, game_assets, game_state);
         editor_state.active = true;
+        editor_state.freeze_block_placing = false;
     }
 }
 
 fn editor_close(
     mut commands: Commands,
     camera_query: Query<Entity, With<EditorCameraMarker>>,
+    node_query: Query<
+        Entity,
+        (
+            With<NodeForBlockPlacingButtonsMarker>,
+            Without<EditorCameraMarker>,
+        ),
+    >,
     game_state: Res<GameState>,
     mut editor_state: ResMut<EditorState>,
 ) {
     if game_state.variant == GameStateVariant::Level && editor_state.active {
         for entity in camera_query.iter() {
-            commands.entity(entity).despawn();
-            editor_state.active = false;
+            for node_entity in node_query.iter() {
+                commands.entity(entity).despawn();
+                commands.entity(node_entity).despawn_recursive();
+                editor_state.active = false;
+            }
         }
     }
 }
@@ -144,6 +167,10 @@ fn place_blocks(
 ) {
     let window = windows.get_primary().unwrap();
 
+    if editor_state.freeze_block_placing == true {
+        return;
+    }
+
     if buttons.just_pressed(MouseButton::Left) {
         for (camera, camera_transform) in camera_query.iter() {
             if let Some(world_position) = window
@@ -167,24 +194,72 @@ fn place_blocks(
                 }
 
                 commands
-                    .spawn(SpriteSheetBundle {
-                        texture_atlas: game_assets.texture_atlas.clone(),
-                        sprite: TextureAtlasSprite::new(editor_state.picked_block_id.into()),
+                    .spawn(SpriteBundle {
+                        texture: game_assets.blocks[editor_state.picked_block_id as usize].clone(),
                         ..default()
                     })
                     .insert(Transform {
                         translation: pos,
                         scale: Vec3::new(2.0, 2.0, 1.0),
                         ..default()
-                    });
+                    })
+                    .insert(RigidBody::Fixed)
+                    .insert(Collider::cuboid(15.0, 15.0))
+                    .insert(GroundMarker);
             }
         }
     }
 }
 
-fn select_block(keyboard: Res<Input<KeyCode>>, mut editor_state: ResMut<EditorState>) {
-    if keyboard.pressed(KeyCode::Q) {
-        editor_state.picked_block_id = 9;
+fn button_clicked(
+    interaction: Query<(&Interaction, &BlockButton), Changed<Interaction>>,
+    mut editor_state: ResMut<EditorState>,
+) {
+    for (interaction, button) in &interaction {
+        if matches!(interaction, Interaction::Clicked) {
+            editor_state.picked_block_id = button.id;
+        } else if matches!(interaction, Interaction::Hovered) {
+            editor_state.freeze_block_placing = true;
+        } else {
+            editor_state.freeze_block_placing = false;
+        }
+    }
+}
+
+fn spawn_button(mut commands: Commands, game_assets: Res<GameAssets>, game_state: Res<GameState>) {
+
+    if game_state.variant == GameStateVariant::Editor {
+        commands
+            .spawn(NodeBundle {
+                style: Style {
+                    size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+                ..default()
+            })
+            .insert(Name::new("Node"))
+            .insert(NodeForBlockPlacingButtonsMarker)
+            .with_children(|commands| {
+                for i in 0..3 {
+                    commands
+                        .spawn(ButtonBundle {
+                            style: Style {
+                                size: Size::new(
+                                    Val::Percent(15.0 * 9.0 / 16.0),
+                                    Val::Percent(15.0),
+                                ),
+                                align_self: AlignSelf::FlexEnd,
+                                margin: UiRect::all(Val::Percent(2.0)),
+                                ..default()
+                            },
+                            image: game_assets.blocks[i as usize].clone().into(),
+                            ..default()
+                        })
+                        .insert(BlockButton { id: i})
+                        .insert(Name::new("Button"));
+                }
+            });
     }
 }
 
@@ -198,7 +273,7 @@ impl Plugin for EditorPlugin {
             .add_system(camera_movement)
             .add_system(camera_zoom)
             .add_system(place_blocks)
-            .add_system(select_block)
-            .add_system(draw_editor_lines);
+            //.add_system(draw_editor_lines)
+            .add_system(button_clicked.after(place_blocks));
     }
 }

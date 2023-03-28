@@ -41,9 +41,8 @@ fn level_open(
 ) {
     if game_state.variant == GameStateVariant::Level && level_state.active == false {
         commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: game_assets.texture_atlas.clone(),
-                sprite: TextureAtlasSprite::new(2),
+            .spawn(SpriteBundle {
+                texture: game_assets.cube0.clone(),
                 ..default()
             })
             .insert(Transform {
@@ -198,17 +197,17 @@ fn reset_player_jump(
         (Entity, &mut Jump, &mut Transform),
         (With<PlayerMarker>, Without<GroundMarker>),
     >,
-    mut ground_query: Query<Entity, With<GroundMarker>>,
+    ground_query: Query<Entity, With<GroundMarker>>,
     rapier_context: Res<RapierContext>,
 ) {
-    let ground_id = ground_query.single_mut();
-
-    for (player_id, mut jump, mut transform) in player_query.iter_mut() {
-        if let Some(_contact_pair) = rapier_context.contact_pair(player_id, ground_id) {
-            jump.is_jumping = false;
-            transform.rotation = Quat::from_rotation_z(
-                ceil_to_full_rotation(jump.rotation_value) * 3.1415 / 180.0 as f32,
-            );
+    for ground_id in ground_query.iter() {
+        for (player_id, mut jump, mut transform) in player_query.iter_mut() {
+            if let Some(_contact_pair) = rapier_context.contact_pair(player_id, ground_id) {
+                jump.is_jumping = false;
+                transform.rotation = Quat::from_rotation_z(
+                    ceil_to_full_rotation(jump.rotation_value) * 3.1415 / 180.0 as f32,
+                );
+            }
         }
     }
 }
