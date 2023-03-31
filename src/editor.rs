@@ -1,3 +1,5 @@
+use serde::{Serialize};
+
 use bevy::{input::mouse::MouseScrollUnit, input::mouse::MouseWheel, prelude::*};
 use bevy_prototype_debug_lines::{DebugLines, DebugLinesPlugin};
 use bevy_rapier2d::prelude::*;
@@ -23,6 +25,15 @@ pub struct EditorState {
     pub active: bool,
     pub picked_block_id: u8,
     pub freeze_block_placing: bool,
+}
+
+
+#[derive(Serialize)]
+pub struct BlockInfo {
+    id: u8,
+    name: String,
+    marker_type: u8, //0- spike, 1- block, 2- ClippedBlockMarker
+    coords: (i32, i32),
 }
 
 //used once when transitioning from level to editor
@@ -262,6 +273,36 @@ fn spawn_button(mut commands: Commands, game_assets: Res<GameAssets>, game_state
     }
 }
 
+fn save_level(
+    keyboard: Res<Input<KeyCode>>,
+){
+    if keyboard.just_pressed(KeyCode::O){
+        let block_info_vec = vec![
+            BlockInfo {
+                id: 0,
+                name: "Spike0".to_string(),
+                marker_type: 0,
+                coords: (0, -256)
+            },
+            BlockInfo {
+                id: 0,
+                name: "Spike0".to_string(),
+                marker_type: 0,
+                coords: (64, -256)
+            },
+            BlockInfo {
+                id: 0,
+                name: "Spike0".to_string(),
+                marker_type: 0,
+                coords: (128, -256)
+            },
+        ];
+    
+        let file = std::fs::File::create("test_map.json").unwrap();
+        serde_json::to_writer_pretty(file, &block_info_vec).unwrap();
+    }
+}
+
 pub struct EditorPlugin;
 impl Plugin for EditorPlugin {
     fn build(&self, app: &mut App) {
@@ -273,6 +314,7 @@ impl Plugin for EditorPlugin {
             .add_system(camera_zoom)
             .add_system(place_blocks)
             //.add_system(draw_editor_lines)
+            .add_system(save_level)
             .add_system(button_clicked.after(place_blocks));
     }
 }

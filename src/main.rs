@@ -12,8 +12,6 @@ use editor::{EditorPlugin, EditorState};
 //markers
 #[derive(Component)]
 struct GroundMarker;
-#[derive(Component)]
-struct SpikeMarker;
 
 //others
 const BG_COLOR: Color = Color::rgb(0.2, 0.36, 0.89);

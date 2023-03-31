@@ -19,6 +19,9 @@ struct SpikeMarker;
 struct ClippedBlockMarker;
 
 #[derive(Component)]
+struct SerializableMarker; //marks every object that can be serialized
+
+#[derive(Component)]
 enum BlockType {
     Spike(SpikeMarker),
     Ground(GroundMarker),
@@ -85,6 +88,7 @@ fn level_open(
                     ..default()
                 })
                 .insert(block_type)
+                .insert(SerializableMarker)
                 .insert(Collider::cuboid(4.0, 10.0))
                 .insert(Name::new(block_info.name));
         }
