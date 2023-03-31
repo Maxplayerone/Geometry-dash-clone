@@ -5,7 +5,7 @@ use std::io::BufReader;
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::{GameAssets, GameState, GameStateVariant, GroundMarker, SpikeMarker};
+use crate::{GameAssets, GameState, GameStateVariant, GroundMarker};
 
 #[derive(Component)]
 struct PlayerMarker;
@@ -13,6 +13,17 @@ struct PlayerMarker;
 struct LevelCameraMarker;
 #[derive(Component)]
 struct AttemptsTextMarker;
+#[derive(Component)]
+struct SpikeMarker;
+#[derive(Component)]
+struct ClippedBlockMarker;
+
+#[derive(Component)]
+enum BlockType {
+    Spike(SpikeMarker),
+    Ground(GroundMarker),
+    Clipped(ClippedBlockMarker),
+}
 
 const PLAYER_JUMP_VALUE: f32 = 900.0;
 const PLAYER_SPEED: f32 = 450.0;
@@ -37,6 +48,8 @@ pub struct LevelState {
 #[derive(Debug, Deserialize)]
 pub struct BlockInfo {
     id: u8,
+    name: String,
+    marker_type: u8, //0- spike, 1- block, 2- ClippedBlockMarker
     coords: (i32, i32),
 }
 
@@ -53,9 +66,14 @@ fn level_open(
         let file = File::open("test_map.json").unwrap();
         let reader = BufReader::new(file);
         let block_info_vec: Vec<BlockInfo> = serde_json::from_reader(reader).unwrap();
-        println!("{:#?}", block_info_vec);
 
         for block_info in block_info_vec {
+            let block_type = match block_info.marker_type {
+                0 => BlockType::Spike(SpikeMarker),
+                1 => BlockType::Ground(GroundMarker),
+                _ => BlockType::Clipped(ClippedBlockMarker),
+            };
+
             commands
                 .spawn(SpriteBundle {
                     texture: game_assets.blocks[block_info.id as usize].clone(),
@@ -66,9 +84,9 @@ fn level_open(
                     scale: Vec3::new(2.0, 2.0, 1.0),
                     ..default()
                 })
-                .insert(SpikeMarker)
+                .insert(block_type)
                 .insert(Collider::cuboid(4.0, 10.0))
-                .insert(Name::new("Spike01"));
+                .insert(Name::new(block_info.name));
         }
 
         commands

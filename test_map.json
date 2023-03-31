@@ -1,14 +1,32 @@
 [
     {
       "id": 0,
+      "name": "Spike0",
+      "marker_type": 0,
       "coords": [0, -256]
     },
     {
       "id": 0,
+      "name": "Spike1",
+      "marker_type": 0,
       "coords": [64, -256]
     },
     {
       "id": 0,
+      "name": "Spike2",
+      "marker_type": 0,
       "coords": [128, -256]
+    },
+    {
+      "id": 1,
+      "name": "Block 1",
+      "marker_type": 1,
+      "coords": [128, -192]
+    },
+    {
+      "id": 1,
+      "name": "Block 1",
+      "marker_type": 1,
+      "coords": [-64, -256]
     }
 ]
