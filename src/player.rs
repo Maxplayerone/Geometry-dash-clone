@@ -1,3 +1,7 @@
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::BufReader;
+
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
@@ -30,6 +34,12 @@ pub struct LevelState {
     pub active: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct BlockInfo {
+    id: u8,
+    coords: (i32, i32),
+}
+
 #[derive(Default)]
 pub struct RespawnPlayerEvent;
 
@@ -40,6 +50,27 @@ fn level_open(
     mut level_state: ResMut<LevelState>,
 ) {
     if game_state.variant == GameStateVariant::Level && level_state.active == false {
+        let file = File::open("test_map.json").unwrap();
+        let reader = BufReader::new(file);
+        let block_info_vec: Vec<BlockInfo> = serde_json::from_reader(reader).unwrap();
+        println!("{:#?}", block_info_vec);
+
+        for block_info in block_info_vec {
+            commands
+                .spawn(SpriteBundle {
+                    texture: game_assets.blocks[block_info.id as usize].clone(),
+                    ..default()
+                })
+                .insert(Transform {
+                    translation: Vec3::new(block_info.coords.0 as f32, block_info.coords.1 as f32, 0.0),
+                    scale: Vec3::new(2.0, 2.0, 1.0),
+                    ..default()
+                })
+                .insert(SpikeMarker)
+                .insert(Collider::cuboid(4.0, 10.0))
+                .insert(Name::new("Spike01"));
+        }
+
         commands
             .spawn(SpriteBundle {
                 texture: game_assets.cube0.clone(),

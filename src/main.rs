@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
+use std::env;
 
 mod player;
 use player::{LevelState, PlayerPlugin};
@@ -32,6 +33,12 @@ pub struct GameState {
     variant: GameStateVariant,
 }
 
+static mut GAME_STATE_EARLY: i32 = 0; //setting up the game state early via
+                                      //cla and then changing the actual GameState based on this value
+
+//1- game
+//2- editor
+
 #[derive(Eq, PartialEq)]
 pub enum GameStateVariant {
     Editor, //you can move the camera, the player does not exist
@@ -39,6 +46,30 @@ pub enum GameStateVariant {
 }
 
 fn main() {
+    match env::args().nth(1) {
+        Some(input) if input == "game" => {
+            println!("You entered 'game");
+            unsafe {
+                GAME_STATE_EARLY = 1;
+            }
+        }
+        Some(input) if input == "editor" => {
+            println!("You entered 'editor'.");
+            unsafe {
+                GAME_STATE_EARLY = 2;
+            }
+        }
+        Some(input) => {
+            println!(
+                "You entered '{}', but I was expecting either 'game' or 'editor'.",
+                input
+            );
+        }
+        None => {
+            println!("Please provide an argument.");
+        }
+    }
+
     App::new()
         .add_plugins(
             DefaultPlugins
@@ -65,16 +96,11 @@ fn main() {
         .insert_resource(ClearColor(BG_COLOR))
         .add_startup_system_to_stage(StartupStage::PreStartup, asset_loading)
         .add_startup_system(setup)
-        //.add_system(update_attemps_text)
-        .add_system(toggle_game_state)
         .add_system(bevy::window::close_on_esc)
         .run();
 }
 
-fn asset_loading(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+fn asset_loading(mut commands: Commands, asset_server: Res<AssetServer>) {
     let cube0 = asset_server.load("cube0.png");
     let cube1 = asset_server.load("cube1.png");
     let block0 = asset_server.load("block0.png");
@@ -85,7 +111,7 @@ fn asset_loading(
 
     commands.insert_resource(GameAssets {
         font_roboto_black,
-        cube0, 
+        cube0,
         cube1,
         blocks: [block0, block1, block2],
     });
@@ -93,6 +119,7 @@ fn asset_loading(
 
 fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
     //spikes
+    /*
     for i in 0..3 {
         commands
             .spawn(SpriteBundle {
@@ -108,6 +135,7 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
             .insert(Collider::cuboid(4.0, 10.0))
             .insert(Name::new("Spike01"));
     }
+    */
 
     //ground
     commands
@@ -126,7 +154,12 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
         .insert(Name::new("Ground"));
 
     commands.insert_resource(GameState {
-        variant: GameStateVariant::Editor,
+        variant: unsafe {
+            match GAME_STATE_EARLY {
+                1 => GameStateVariant::Level,
+                _ => GameStateVariant::Editor,
+            }
+        },
     });
 
     commands.insert_resource(EditorState {
@@ -138,16 +171,4 @@ fn setup(mut commands: Commands, game_assets: Res<GameAssets>) {
         attempts: 0,
         active: false,
     });
-}
-
-fn toggle_game_state(keys: Res<Input<KeyCode>>, mut game_state: ResMut<GameState>) {
-    if keys.just_pressed(KeyCode::Key1) {
-        game_state.variant = GameStateVariant::Level;
-        println!("In level");
-    }
-
-    if keys.just_pressed(KeyCode::Key2) {
-        game_state.variant = GameStateVariant::Editor;
-        println!("In editor");
-    }
 }

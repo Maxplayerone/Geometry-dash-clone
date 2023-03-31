@@ -227,7 +227,6 @@ fn button_clicked(
 }
 
 fn spawn_button(mut commands: Commands, game_assets: Res<GameAssets>, game_state: Res<GameState>) {
-
     if game_state.variant == GameStateVariant::Editor {
         commands
             .spawn(NodeBundle {
@@ -256,7 +255,7 @@ fn spawn_button(mut commands: Commands, game_assets: Res<GameAssets>, game_state
                             image: game_assets.blocks[i as usize].clone().into(),
                             ..default()
                         })
-                        .insert(BlockButton { id: i})
+                        .insert(BlockButton { id: i })
                         .insert(Name::new("Button"));
                 }
             });
